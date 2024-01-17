@@ -1,5 +1,31 @@
 import pandas as pd
 
+def parse_description(description, keys):
+    """
+    Revised function to parse the 'Description' column into multiple columns based on predefined keys.
+    """
+    parsed_data = {key: "" for key in keys}
+    lines = description.split('\n')
+    current_key = None
+
+    for line in lines:
+        # Check if the line contains any of the keys
+        found_key = next((key for key in keys if line.startswith(key)), None)
+        if found_key:
+            current_key = found_key
+            # Extract the value part of the line (after the key and potential colon)
+            value = line[len(found_key):].lstrip(": ").strip()
+            parsed_data[current_key] = value
+        elif current_key:
+            # Append line to the current key value
+            parsed_data[current_key] += (' ' + line.strip()) if line.strip() else ''
+
+    return parsed_data
+
+# Load the CSV file
+csv_file_path = 'dataset.csv'
+df = pd.read_csv(csv_file_path)
+
 # List of predefined keys
 keys = [
     "Sales Rep",
@@ -23,43 +49,11 @@ keys = [
     "File Attachments"
 ]
 
-def process_block_with_defined_keys(block, keys):
-    """
-    Process a single block of text using predefined keys.
-    """
-    lines = block.strip().split('\n')
-    record = {key: "" for key in keys}
-    current_key = None
+# Apply the revised parsing function to the 'Description' column
+parsed_columns = df['Description'].apply(lambda x: pd.Series(parse_description(x, keys)))
 
-    for line in lines:
-        # Check if the line is a key
-        if line in keys:
-            current_key = line
-        elif current_key:
-            # Append line to the current key value
-            record[current_key] += line.strip() + ' '
-    
-    # Trim trailing spaces from values
-    for key in record:
-        record[key] = record[key].strip()
+# Merge the new columns with the original DataFrame
+df_expanded = df.join(parsed_columns)
 
-    return record
-
-# Path to the text file
-text_file_path = 'cell.txt'
-
-# Read the data from the file
-with open(text_file_path, 'r') as file:
-    data = file.read()
-
-# Split the data into blocks, using ';;;' as the delimiter
-blocks = data.split(';;;')
-
-# Process each block using the predefined keys
-records = [process_block_with_defined_keys(block, keys) for block in blocks if block.strip()]
-
-# Convert the list of dictionaries to a pandas DataFrame
-df = pd.DataFrame(records)
-
-# Save the DataFrame to an Excel file
-df.to_excel('output.xlsx', index=False)
+# Save the expanded DataFrame to a new CSV file in the same directory
+df_expanded.to_csv('expanded_dataset.csv', index=False)
